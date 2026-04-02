@@ -1,0 +1,5 @@
+{
+  "name": "灵寻巧度——桌面级智能三坐标测量系统",
+  "description": "桌面级智能三坐标测量系统，提供高精度的三维测量、数据分析和可视化功能。",
+  "requestFramePermissions": ["camera"]
+}
