@@ -48,7 +48,9 @@ import {
   Bell,
   X,
   AlertCircle,
-  BarChart2
+  BarChart2,
+  XCircle,
+  MinusCircle
 } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useTransform, useSpring, Reorder } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -143,7 +145,7 @@ const SidebarWheel = ({ activeTab, setActiveTab, onSettingsClick }: { activeTab:
                 }`}>
                   {tab.icon}
                 </motion.div>
-                <span className={`mt-2 text-[10px] font-display font-bold tracking-widest transition-opacity duration-300 ${
+                <span className={`mt-2 text-xs font-display font-bold tracking-widest transition-opacity duration-300 ${
                   isActive ? 'opacity-100 text-nb-blue-primary' : 'opacity-0 group-hover:opacity-100'
                 }`}>
                   {tab.label}
@@ -237,11 +239,11 @@ const SettingsModal = ({ isOpen, onClose, isDarkMode, setIsDarkMode }: { isOpen:
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="relative w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl border border-nb-border overflow-hidden"
+          className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-nb-border overflow-hidden"
         >
           <div className="p-10">
             <div className="flex justify-between items-center mb-10">
-              <h2 className="text-3xl font-display font-black text-nb-text">系统<span className="text-nb-blue-primary">设置</span></h2>
+              <h2 className="text-3xl font-display font-bold text-nb-text">系统<span className="text-nb-blue-primary">设置</span></h2>
               <button onClick={onClose} className="p-3 hover:bg-nb-surface rounded-2xl transition-all">
                 <X size={24} />
               </button>
@@ -254,8 +256,8 @@ const SettingsModal = ({ isOpen, onClose, isDarkMode, setIsDarkMode }: { isOpen:
                     {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-nb-text">深色模式</h4>
-                    <p className="text-[10px] text-nb-text-muted font-bold uppercase tracking-widest">切换界面主题颜色</p>
+                    <h4 className="text-sm font-bold text-nb-text">深色模式</h4>
+                    <p className="text-xs text-nb-text-muted font-bold uppercase tracking-widest">切换界面主题颜色</p>
                   </div>
                 </div>
                 <button 
@@ -286,8 +288,8 @@ const SettingsModal = ({ isOpen, onClose, isDarkMode, setIsDarkMode }: { isOpen:
                       </button>
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-nb-text">{item.label}</h4>
-                      <p className="text-[10px] text-nb-text-muted font-bold leading-tight mt-1">{item.desc}</p>
+                      <h4 className="text-xs font-bold text-nb-text">{item.label}</h4>
+                      <p className="text-xs text-nb-text-muted font-bold leading-tight mt-1">{item.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -295,8 +297,8 @@ const SettingsModal = ({ isOpen, onClose, isDarkMode, setIsDarkMode }: { isOpen:
             </div>
 
             <div className="mt-12 flex justify-end gap-4">
-              <button onClick={onClose} className="px-8 py-3 text-xs font-black text-nb-text-muted hover:text-nb-text transition-all">取消</button>
-              <button onClick={onClose} className="px-10 py-3 bg-nb-blue-primary text-white text-xs font-black rounded-2xl shadow-lg shadow-nb-blue-primary/20 hover:scale-105 transition-all">保存更改</button>
+              <button onClick={onClose} className="px-8 py-3 text-xs font-bold text-nb-text-muted hover:text-nb-text transition-all">取消</button>
+              <button onClick={onClose} className="px-10 py-3 bg-nb-blue-primary text-white text-xs font-bold rounded-2xl shadow-lg shadow-nb-blue-primary/20 hover:scale-105 transition-all">保存更改</button>
             </div>
           </div>
         </motion.div>
@@ -305,12 +307,140 @@ const SettingsModal = ({ isOpen, onClose, isDarkMode, setIsDarkMode }: { isOpen:
   </AnimatePresence>
 );
 
+const DependencyGraph = ({ steps }: { steps: any[] }) => {
+  const levels: Record<string, number> = {};
+  steps.forEach(s => levels[s.id] = 0);
+  let changed = true;
+  let iterations = 0;
+  while(changed && iterations < 100) {
+    changed = false;
+    steps.forEach(s => {
+      const maxDepLevel = s.dependsOn.length === 0 ? -1 : Math.max(...s.dependsOn.map((depId: string) => levels[depId] ?? -1));
+      if (levels[s.id] !== maxDepLevel + 1) {
+        levels[s.id] = maxDepLevel + 1;
+        changed = true;
+      }
+    });
+    iterations++;
+  }
+
+  const levelGroups: Record<number, any[]> = {};
+  steps.forEach(s => {
+    const l = levels[s.id];
+    if (!levelGroups[l]) levelGroups[l] = [];
+    levelGroups[l].push(s);
+  });
+
+  const maxLevel = Math.max(0, ...Object.values(levels));
+  const height = (maxLevel + 1) * 100;
+
+  const positions: Record<string, {x: number, y: number}> = {};
+  Object.entries(levelGroups).forEach(([levelStr, levelSteps]) => {
+    const level = parseInt(levelStr);
+    levelSteps.forEach((step, idx) => {
+      positions[step.id] = {
+        x: (idx + 1) * (100 / (levelSteps.length + 1)),
+        y: level * 100 + 50
+      };
+    });
+  });
+
+  return (
+    <div className="w-full relative overflow-visible mt-4" style={{ height: `${height}px` }}>
+      <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+        {steps.map(step => 
+          step.dependsOn.map((depId: string) => {
+            const p1 = positions[depId];
+            const p2 = positions[step.id];
+            if (!p1 || !p2) return null;
+            return (
+              <path 
+                key={`${depId}-${step.id}`}
+                d={`M ${p1.x}% ${p1.y + 20} C ${p1.x}% ${p1.y + 60}, ${p2.x}% ${p2.y - 60}, ${p2.x}% ${p2.y - 20}`}
+                fill="none"
+                stroke="#0055FF"
+                strokeWidth="2"
+                strokeOpacity="0.3"
+                strokeDasharray="4 4"
+              />
+            );
+          })
+        )}
+      </svg>
+      {steps.map(step => {
+        const pos = positions[step.id];
+        let statusClasses = 'bg-white border-2 border-nb-blue-primary text-nb-blue-primary';
+        if (step.status === 'done' || step.status === 'completed') statusClasses = 'bg-emerald-500 text-white';
+        else if (step.status === 'failed') statusClasses = 'bg-red-500 text-white';
+        else if (step.status === 'skipped') statusClasses = 'bg-gray-400 text-white';
+
+        return (
+          <div 
+            key={step.id} 
+            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1"
+            style={{ left: `${pos.x}%`, top: `${pos.y}px` }}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-10 ${statusClasses}`}>
+              {step.id}
+            </div>
+            <span className="text-xs font-bold text-nb-text-muted whitespace-nowrap bg-white/80 px-1 rounded">{step.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const PreviewView = ({ config }: { config: any }) => {
   const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+  const [isARMode, setIsARMode] = useState(false);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [modelFormat, setModelFormat] = useState('STL');
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [steps, setSteps] = useState([
+    { id: '01', label: '基准面 A 测量', status: 'done', dependsOn: [] as string[] },
+    { id: '02', label: '圆孔 D1 直径', status: 'pending', dependsOn: ['01'] },
+    { id: '03', label: '圆孔 D2 直径', status: 'pending', dependsOn: ['01'] },
+    { id: '04', label: '平面度检测', status: 'pending', dependsOn: ['02', '03'] },
+  ]);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+
+  const toggleDependency = (stepId: string, depId: string) => {
+    setSteps(steps.map(s => {
+      if (s.id === stepId) {
+        const newDeps = s.dependsOn.includes(depId)
+          ? s.dependsOn.filter(id => id !== depId)
+          : [...s.dependsOn, depId];
+        return { ...s, dependsOn: newDeps };
+      }
+      return s;
+    }));
+  };
+
+  const updateStepStatus = (stepId: string, newStatus: string) => {
+    setSteps(steps.map(s => s.id === stepId ? { ...s, status: newStatus } : s));
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsModelLoaded(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (isARMode) {
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      });
+    } else {
+      videoRef.current?.srcObject?.getTracks().forEach(track => track.stop());
+    }
+  }, [isARMode]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -355,18 +485,41 @@ const PreviewView = ({ config }: { config: any }) => {
     <div className="flex-1 p-12 neo-gradient overflow-hidden flex flex-col">
       <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col">
         <div className="flex justify-between items-end mb-12">
-          <h2 className="text-5xl font-display font-black tracking-tighter text-nb-text">路径<br/><span className="text-nb-blue-primary">预览</span></h2>
+          <h2 className="text-5xl font-display font-bold tracking-tighter text-nb-text">路径<br/><span className="text-nb-blue-primary">预览</span></h2>
           <div className="flex gap-4">
-            <div className="px-6 py-3 bg-white border border-nb-border rounded-2xl text-[10px] font-black text-nb-text-muted uppercase tracking-widest flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              路径已生成
+            <select 
+              value={modelFormat}
+              onChange={(e) => {
+                setModelFormat(e.target.value);
+                setIsModelLoaded(false);
+                setTimeout(() => setIsModelLoaded(true), 1500);
+              }}
+              className="px-4 py-3 bg-white border border-nb-border rounded-2xl text-xs font-bold text-nb-text uppercase tracking-widest outline-none appearance-none cursor-pointer"
+            >
+              <option value="STL">STL 格式</option>
+              <option value="OBJ">OBJ 格式</option>
+              <option value="GLTF">glTF 格式</option>
+            </select>
+            <button 
+              onClick={() => setIsARMode(!isARMode)}
+              disabled={!isModelLoaded}
+              className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${
+                isARMode ? 'bg-nb-blue-primary text-white' : 'bg-white border border-nb-border text-nb-text'
+              } ${!isModelLoaded ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Camera size={16} />
+              {isARMode ? '退出 AR 模式' : '进入 AR 模式'}
+            </button>
+            <div className={`px-6 py-3 bg-white border border-nb-border rounded-2xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${isModelLoaded ? 'text-emerald-600' : 'text-amber-600'}`}>
+              <div className={`w-2 h-2 rounded-full ${isModelLoaded ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+              {isModelLoaded ? '模型已就绪' : '模型加载中...'}
             </div>
           </div>
         </div>
 
         <div className="flex-1 grid grid-cols-12 gap-8 min-h-0">
           <div 
-            className="col-span-8 bg-nb-text rounded-[3rem] shadow-2xl relative overflow-hidden group cursor-grab active:cursor-grabbing"
+            className="col-span-8 bg-nb-text rounded-3xl shadow-2xl relative overflow-hidden group cursor-grab active:cursor-grabbing"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -377,21 +530,33 @@ const PreviewView = ({ config }: { config: any }) => {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
+            {isARMode && (
+              <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+            )}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,85,255,0.1),transparent)]" />
             
             {/* Simulated 3D Viewport */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-96 h-96" style={{ transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)` }}>
                 {/* Grid Floor */}
-                <div className="absolute inset-0 border border-white/5 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] [transform:rotateX(60deg)_rotateZ(45deg)]" />
+                {!isARMode && <div className="absolute inset-0 border border-white/5 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] [transform:rotateX(60deg)_rotateZ(45deg)]" />}
                 
                 {/* Simulated Part */}
                 <motion.div 
                   animate={{ rotateX: rotation.x, rotateY: rotation.y }}
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-nb-blue-primary/20 border-2 border-nb-blue-primary/40 rounded-3xl backdrop-blur-sm [transform-style:preserve-3d]"
+                  className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 rounded-3xl backdrop-blur-sm [transform-style:preserve-3d] ${
+                    modelFormat === 'STL' ? 'bg-nb-blue-primary/20 border-nb-blue-primary/40' :
+                    modelFormat === 'OBJ' ? 'bg-emerald-500/20 border-emerald-500/40' :
+                    'bg-purple-500/20 border-purple-500/40'
+                  }`}
                 >
-                  <div className="absolute inset-0 border border-nb-blue-primary/40 flex items-center justify-center">
-                    <Box size={64} className="text-nb-blue-primary/40" />
+                  <div className={`absolute inset-0 border flex flex-col items-center justify-center ${
+                    modelFormat === 'STL' ? 'border-nb-blue-primary/40 text-nb-blue-primary/40' :
+                    modelFormat === 'OBJ' ? 'border-emerald-500/40 text-emerald-500/40' :
+                    'border-purple-500/40 text-purple-500/40'
+                  }`}>
+                    <Box size={64} />
+                    <span className="mt-4 text-sm font-bold tracking-widest">{modelFormat}</span>
                   </div>
                 </motion.div>
 
@@ -419,33 +584,99 @@ const PreviewView = ({ config }: { config: any }) => {
           </div>
 
           <div className="col-span-4 space-y-8 overflow-y-auto pr-4">
-            <div className="bg-white border border-nb-border rounded-[2.5rem] p-8 shadow-sm">
-              <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase mb-6">测量序列</h3>
-              <div className="space-y-4">
-                {[
-                  { id: '01', label: '基准面 A 测量', status: 'done' },
-                  { id: '02', label: '圆孔 D1 直径', status: 'pending' },
-                  { id: '03', label: '圆孔 D2 直径', status: 'pending' },
-                  { id: '04', label: '平面度检测', status: 'pending' },
-                ].map((step) => (
-                  <div key={step.id} className="flex items-center gap-4 p-4 bg-nb-surface rounded-2xl border border-transparent hover:border-nb-blue-primary/20 transition-all">
-                    <span className="text-[10px] font-black text-nb-blue-primary">{step.id}</span>
-                    <span className="text-xs font-bold text-nb-text flex-1">{step.label}</span>
-                    {step.status === 'done' ? <CheckCircle2 size={14} className="text-emerald-500" /> : <div className="w-3 h-3 rounded-full border-2 border-nb-border" />}
-                  </div>
-                ))}
+            <div className="bg-white border border-nb-border rounded-3xl p-8 shadow-sm">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase">测量序列</h3>
+                <div className="flex bg-nb-surface p-1 rounded-lg">
+                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-nb-blue-primary' : 'text-nb-text-muted hover:text-nb-text'}`}>
+                    <List size={14} />
+                  </button>
+                  <button onClick={() => setViewMode('graph')} className={`p-1.5 rounded-md transition-all ${viewMode === 'graph' ? 'bg-white shadow-sm text-nb-blue-primary' : 'text-nb-text-muted hover:text-nb-text'}`}>
+                    <Grid3X3 size={14} />
+                  </button>
+                </div>
               </div>
+              
+              {viewMode === 'list' ? (
+                <div className="space-y-4">
+                  {steps.map((step) => (
+                    <div key={step.id} className="flex flex-col p-4 bg-nb-surface rounded-2xl border border-transparent hover:border-nb-blue-primary/20 transition-all">
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs font-bold text-nb-blue-primary">{step.id}</span>
+                        <span className="text-xs font-bold text-nb-text flex-1">{step.label}</span>
+                        <button 
+                          onClick={() => setEditingStepId(editingStepId === step.id ? null : step.id)} 
+                          className={`p-1.5 rounded-lg transition-colors ${editingStepId === step.id ? 'bg-nb-blue-primary text-white' : 'bg-white border border-nb-border text-nb-text-muted hover:text-nb-blue-primary'}`}
+                        >
+                          <Layers size={14} />
+                        </button>
+                        <div className="relative flex items-center justify-center w-6 h-6">
+                          <select
+                            value={step.status}
+                            onChange={(e) => updateStepStatus(step.id, e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                            title="更改状态"
+                          >
+                            <option value="pending">等待中 (Pending)</option>
+                            <option value="done">已完成 (Completed)</option>
+                            <option value="failed">失败 (Failed)</option>
+                            <option value="skipped">跳过 (Skipped)</option>
+                          </select>
+                          {(step.status === 'done' || step.status === 'completed') && <CheckCircle2 size={16} className="text-emerald-500" />}
+                          {step.status === 'failed' && <XCircle size={16} className="text-red-500" />}
+                          {step.status === 'skipped' && <MinusCircle size={16} className="text-gray-400" />}
+                          {step.status === 'pending' && <div className="w-3 h-3 rounded-full border-2 border-nb-border" />}
+                        </div>
+                      </div>
+                      
+                      {step.dependsOn.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5 pl-8">
+                          <span className="text-xs font-bold text-nb-text-muted uppercase mr-1 flex items-center">依赖:</span>
+                          {step.dependsOn.map(dep => (
+                            <span key={dep} className="px-2 py-0.5 bg-white border border-nb-border rounded-md text-xs font-bold text-nb-text-muted">
+                              {dep}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {editingStepId === step.id && (
+                        <div className="mt-4 pt-4 border-t border-nb-border pl-8">
+                          <p className="text-xs font-bold text-nb-text-muted mb-3">配置前置依赖:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {steps.filter(s => s.id !== step.id).map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => toggleDependency(step.id, s.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                  step.dependsOn.includes(s.id) 
+                                    ? 'bg-nb-blue-primary text-white shadow-md shadow-nb-blue-primary/20' 
+                                    : 'bg-white border border-nb-border text-nb-text-muted hover:border-nb-blue-primary hover:text-nb-blue-primary'
+                                }`}
+                              >
+                                {s.id} {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <DependencyGraph steps={steps} />
+              )}
             </div>
 
-            <div className="bg-nb-blue-primary rounded-[2.5rem] p-8 text-white shadow-xl shadow-nb-blue-primary/20">
-              <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-white/50 uppercase mb-6">统计摘要</h3>
+            <div className="bg-nb-blue-primary rounded-3xl p-8 text-white shadow-xl shadow-nb-blue-primary/20">
+              <h3 className="text-xs font-display font-bold tracking-widest text-white/50 uppercase mb-6">统计摘要</h3>
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <p className="text-[10px] font-black text-white/40 uppercase mb-1">测点总数</p>
+                  <p className="text-xs font-bold text-white/40 uppercase mb-1">测点总数</p>
                   <p className="text-2xl font-display font-bold">1,248</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-white/40 uppercase mb-1">预计误差</p>
+                  <p className="text-xs font-bold text-white/40 uppercase mb-1">预计误差</p>
                   <p className="text-2xl font-display font-bold">±0.002</p>
                 </div>
               </div>
@@ -475,26 +706,42 @@ const ProjectView = ({ projects, setProjects, onAction }: { projects: any[], set
     <div className="flex-1 p-12 neo-gradient overflow-y-auto">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-end mb-12">
-          <h2 className="text-5xl font-display font-black tracking-tighter text-nb-text">项目<br/><span className="text-nb-blue-primary">存档</span></h2>
+          <h2 className="text-5xl font-display font-bold tracking-tighter text-nb-text">项目<br/><span className="text-nb-blue-primary">存档</span></h2>
           <button 
             onClick={() => onAction('新建项目')}
-            className="flex items-center gap-2 px-8 py-4 bg-nb-blue-primary text-white rounded-2xl text-xs font-black shadow-xl shadow-nb-blue-primary/20 hover:scale-105 transition-all active:scale-95"
+            className="flex items-center gap-2 px-8 py-4 bg-nb-blue-primary text-white rounded-2xl text-xs font-bold shadow-xl shadow-nb-blue-primary/20 hover:scale-105 transition-all active:scale-95"
           >
             <Plus size={18} /> 新建项目
           </button>
         </div>
 
         {selectedProject ? (
-          <div className="bg-white border border-nb-border rounded-[2.5rem] p-8 shadow-sm space-y-8">
+          <div className="bg-white border border-nb-border rounded-3xl p-8 shadow-sm space-y-8">
             <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-display font-black text-nb-text">{selectedProject.name} - 数据分析</h3>
-              <button onClick={() => setSelectedProject(null)} className="text-xs font-black text-nb-text-muted hover:text-nb-blue-primary">返回</button>
+              <h3 className="text-2xl font-display font-bold text-nb-text">{selectedProject.name} - 数据分析</h3>
+              <button onClick={() => setSelectedProject(null)} className="text-xs font-bold text-nb-text-muted hover:text-nb-blue-primary">返回</button>
+            </div>
+
+            <div className="flex gap-8">
+              <div className="w-64 h-48 bg-nb-surface rounded-2xl overflow-hidden border border-nb-border">
+                <img src={`https://picsum.photos/seed/${selectedProject.id}/400/300`} alt="Thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <div className="flex-1 space-y-4">
+                <div className="p-4 bg-nb-surface rounded-2xl">
+                  <p className="text-xs font-bold text-nb-text-muted uppercase mb-1">最后修改日期</p>
+                  <p className="text-sm font-bold text-nb-text">{selectedProject.date}</p>
+                </div>
+                <div className="p-4 bg-nb-surface rounded-2xl">
+                  <p className="text-xs font-bold text-nb-text-muted uppercase mb-1">文件大小</p>
+                  <p className="text-sm font-bold text-nb-text">{(Math.random() * 10 + 2).toFixed(1)} MB</p>
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-3 gap-6">
               {analysisData.map((item) => (
                 <div key={item.name} className="p-6 bg-nb-surface rounded-2xl">
-                  <p className="text-[10px] font-black text-nb-text-muted uppercase mb-1">{item.name}</p>
+                  <p className="text-xs font-bold text-nb-text-muted uppercase mb-1">{item.name}</p>
                   <p className="text-2xl font-display font-bold text-nb-text">{item.value}</p>
                 </div>
               ))}
@@ -517,7 +764,7 @@ const ProjectView = ({ projects, setProjects, onAction }: { projects: any[], set
           <Reorder.Group axis="x" values={projects} onReorder={setProjects} className="grid grid-cols-3 gap-8">
             {projects.map((project) => (
               <Reorder.Item key={project.id} value={project} className="cursor-grab active:cursor-grabbing">
-                <div className="bg-white border border-nb-border rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl transition-all group">
+                <div className="bg-white border border-nb-border rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all group">
                   <div className="flex justify-between items-start mb-6">
                     <div className="p-3 bg-nb-surface rounded-2xl text-nb-blue-primary group-hover:scale-110 transition-transform">
                       <FolderOpen size={24} />
@@ -528,11 +775,11 @@ const ProjectView = ({ projects, setProjects, onAction }: { projects: any[], set
                       <button onClick={() => onAction('删除项目', project)} className="p-2 hover:bg-rose-50 rounded-lg text-nb-text-muted hover:text-rose-500"><Trash2 size={16} /></button>
                     </div>
                   </div>
-                  <h3 className="text-lg font-display font-black text-nb-text mb-2">{project.name}</h3>
+                  <h3 className="text-lg font-display font-bold text-nb-text mb-2">{project.name}</h3>
                   <p className="text-xs text-nb-text-muted mb-6 line-clamp-2">{project.description}</p>
                   <div className="flex items-center justify-between pt-6 border-t border-nb-border">
-                    <span className="text-[10px] font-black text-nb-text-muted uppercase tracking-widest">{project.date}</span>
-                    <span className="px-3 py-1 bg-nb-blue-light text-nb-blue-primary rounded-full text-[10px] font-black uppercase">
+                    <span className="text-xs font-bold text-nb-text-muted uppercase tracking-widest">{project.date}</span>
+                    <span className="px-3 py-1 bg-nb-blue-light text-nb-blue-primary rounded-full text-xs font-bold uppercase">
                       {project.type}
                     </span>
                   </div>
@@ -542,12 +789,12 @@ const ProjectView = ({ projects, setProjects, onAction }: { projects: any[], set
             
             <div 
               onClick={() => onAction('导入资产')}
-              className="bg-nb-surface border-4 border-dashed border-nb-border rounded-[2.5rem] flex flex-col items-center justify-center gap-6 hover:border-nb-blue-primary/50 transition-all group cursor-pointer aspect-[4/3]"
+              className="bg-nb-surface border-4 border-dashed border-nb-border rounded-3xl flex flex-col items-center justify-center gap-6 hover:border-nb-blue-primary/50 transition-all group cursor-pointer aspect-[4/3]"
             >
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-nb-text-muted group-hover:scale-110 group-hover:text-nb-blue-primary transition-all shadow-sm">
                 <Plus size={28} />
               </div>
-              <p className="text-xs font-display font-black tracking-widest text-nb-text-muted uppercase">导入外部资产</p>
+              <p className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase">导入外部资产</p>
             </div>
           </Reorder.Group>
         )}
@@ -560,12 +807,12 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
     <div className="flex-1 p-12 neo-gradient overflow-y-auto">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-end mb-12">
-          <h2 className="text-5xl font-display font-black tracking-tighter text-nb-text">任务<br/><span className="text-nb-blue-primary">配置</span></h2>
+          <h2 className="text-5xl font-display font-bold tracking-tighter text-nb-text">任务<br/><span className="text-nb-blue-primary">配置</span></h2>
           <div className="flex gap-4">
-            <button onClick={() => onAction('保存配置')} className="flex items-center gap-2 px-6 py-3 bg-white border border-nb-border rounded-2xl text-xs font-black text-nb-text hover:bg-nb-surface transition-all active:scale-95">
+            <button onClick={() => onAction('保存配置')} className="flex items-center gap-2 px-6 py-3 bg-white border border-nb-border rounded-2xl text-xs font-bold text-nb-text hover:bg-nb-surface transition-all active:scale-95">
               <Save size={16} /> 保存预设
             </button>
-            <button onClick={() => onAction('导入配置')} className="flex items-center gap-2 px-6 py-3 bg-white border border-nb-border rounded-2xl text-xs font-black text-nb-text hover:bg-nb-surface transition-all active:scale-95">
+            <button onClick={() => onAction('导入配置')} className="flex items-center gap-2 px-6 py-3 bg-white border border-nb-border rounded-2xl text-xs font-bold text-nb-text hover:bg-nb-surface transition-all active:scale-95">
               <FolderOpen size={16} /> 导入
             </button>
           </div>
@@ -573,11 +820,11 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
 
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-8 space-y-8">
-            <div className="bg-white border border-nb-border rounded-[3rem] p-10 shadow-sm">
-              <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase mb-8">基础参数</h3>
+            <div className="bg-white border border-nb-border rounded-3xl p-10 shadow-sm">
+              <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase mb-8">基础参数</h3>
               <div className="grid grid-cols-2 gap-8">
                 <div className="group">
-                  <label className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted mb-3 block">测量名称</label>
+                  <label className="text-xs font-display font-bold tracking-widest text-nb-text-muted mb-3 block">测量名称</label>
                   <input 
                     type="text" 
                     value={config.name}
@@ -587,7 +834,7 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
                   />
                 </div>
                 <div className="group">
-                  <label className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted mb-3 block">采样频率 (Hz)</label>
+                  <label className="text-xs font-display font-bold tracking-widest text-nb-text-muted mb-3 block">采样频率 (Hz)</label>
                   <select 
                     value={config.frequency}
                     onChange={(e) => setConfig({...config, frequency: e.target.value})}
@@ -599,13 +846,13 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
                   </select>
                 </div>
                 <div className="group">
-                  <label className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted mb-3 block">精度等级</label>
+                  <label className="text-xs font-display font-bold tracking-widest text-nb-text-muted mb-3 block">精度等级</label>
                   <div className="flex gap-2">
                     {['标准', '精细', '极致'].map((level) => (
                       <button 
                         key={level}
                         onClick={() => setConfig({...config, precision: level})}
-                        className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${
+                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${
                           config.precision === level 
                             ? 'bg-nb-blue-primary text-white shadow-lg shadow-nb-blue-primary/20' 
                             : 'bg-nb-surface text-nb-text-muted hover:bg-nb-border'
@@ -617,7 +864,7 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
                   </div>
                 </div>
                 <div className="group">
-                  <label className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted mb-3 block">测头选择</label>
+                  <label className="text-xs font-display font-bold tracking-widest text-nb-text-muted mb-3 block">测头选择</label>
                   <div className="relative">
                     <select 
                       value={config.probe}
@@ -634,8 +881,8 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
               </div>
             </div>
 
-            <div className="bg-white border border-nb-border rounded-[3rem] p-10 shadow-sm">
-              <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase mb-8">快速操作</h3>
+            <div className="bg-white border border-nb-border rounded-3xl p-10 shadow-sm">
+              <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase mb-8">快速操作</h3>
               <div className="grid grid-cols-3 gap-6">
                 {[
                   { icon: <Zap size={18} />, label: '自动对焦', action: 'AF' },
@@ -650,7 +897,7 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
                     <div className="p-3 bg-white rounded-2xl shadow-sm group-hover:scale-110 transition-transform">
                       {item.icon}
                     </div>
-                    <span className="text-xs font-black tracking-widest uppercase">{item.label}</span>
+                    <span className="text-xs font-bold tracking-widest uppercase">{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -658,27 +905,27 @@ const PrepareView = ({ config, setConfig, onAction }: { config: any, setConfig: 
           </div>
 
           <div className="col-span-4">
-            <div className="bg-nb-text rounded-[3rem] p-10 text-white h-full relative overflow-hidden shadow-2xl">
+            <div className="bg-nb-text rounded-3xl p-10 text-white h-full relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 w-64 h-64 bg-nb-blue-primary/20 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-8">
                   <Info size={20} className="text-nb-blue-primary" />
-                  <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-white/50 uppercase">配置说明</h3>
+                  <h3 className="text-xs font-display font-bold tracking-widest text-white/50 uppercase">配置说明</h3>
                 </div>
                 <div className="space-y-6">
                   <div>
-                    <h4 className="text-sm font-black mb-2">精度优先模式</h4>
+                    <h4 className="text-sm font-bold mb-2">精度优先模式</h4>
                     <p className="text-xs text-white/60 leading-relaxed">当前选择的“极致”精度将启用 0.0001mm 光栅尺闭环控制，建议在恒温环境下进行。</p>
                   </div>
                   <div className="h-[1px] bg-white/10" />
                   <div>
-                    <h4 className="text-sm font-black mb-2">测头兼容性</h4>
+                    <h4 className="text-sm font-bold mb-2">测头兼容性</h4>
                     <p className="text-xs text-white/60 leading-relaxed">TP20 探针已通过 HSK-T 接口自动识别，校准参数已加载。</p>
                   </div>
                 </div>
                 <div className="mt-12 p-6 bg-white/5 rounded-3xl border border-white/10">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-black text-white/40 uppercase">预计耗时</span>
+                    <span className="text-xs font-bold text-white/40 uppercase">预计耗时</span>
                     <span className="text-lg font-display font-bold">12:45</span>
                   </div>
                   <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
@@ -718,7 +965,7 @@ const NewsCard = () => {
   };
 
   return (
-    <div className="bg-white border border-nb-border rounded-[2.5rem] p-8 shadow-sm flex flex-col h-full relative">
+    <div className="bg-white border border-nb-border rounded-3xl p-8 shadow-sm flex flex-col h-full relative">
       <AnimatePresence>
         {selectedNews && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
@@ -727,7 +974,7 @@ const NewsCard = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedNews(null)}
-              className="absolute inset-0 bg-nb-text/20 backdrop-blur-sm rounded-[2.5rem]"
+              className="absolute inset-0 bg-nb-text/20 backdrop-blur-sm rounded-3xl"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 10 }}
@@ -736,7 +983,7 @@ const NewsCard = () => {
               className="relative w-full bg-white rounded-3xl shadow-xl border border-nb-border p-6"
             >
               <div className="flex justify-between items-start mb-4">
-                <h4 className="text-sm font-black text-nb-text">{selectedNews.title}</h4>
+                <h4 className="text-sm font-bold text-nb-text">{selectedNews.title}</h4>
                 <button onClick={() => setSelectedNews(null)} className="p-1 hover:bg-nb-surface rounded-lg">
                   <X size={16} />
                 </button>
@@ -754,12 +1001,12 @@ const NewsCard = () => {
           <div className="p-2 bg-nb-blue-light rounded-xl text-nb-blue-primary">
             <Newspaper size={20} />
           </div>
-          <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase">系统快讯</h3>
+          <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase">系统快讯</h3>
         </div>
         <button 
           onClick={refreshNews}
           disabled={isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-nb-surface border border-nb-border rounded-full text-[10px] font-black text-nb-blue-primary hover:bg-nb-blue-light transition-all active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-nb-surface border border-nb-border rounded-full text-xs font-bold text-nb-blue-primary hover:bg-nb-blue-light transition-all active:scale-95 disabled:opacity-50"
         >
           <RefreshCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
           刷新快讯
@@ -770,7 +1017,7 @@ const NewsCard = () => {
           <div key={item.id} className="p-4 bg-nb-surface rounded-2xl border border-transparent hover:border-nb-blue-primary/20 transition-all group cursor-pointer">
             <div className="flex justify-between items-start mb-2">
               <span className="text-xs font-bold text-nb-text group-hover:text-nb-blue-primary transition-colors">{item.title}</span>
-              <span className="text-[10px] text-nb-text-muted whitespace-nowrap ml-4">{item.time}</span>
+              <span className="text-xs text-nb-text-muted whitespace-nowrap ml-4">{item.time}</span>
             </div>
             {item.details && (
               <button 
@@ -778,7 +1025,7 @@ const NewsCard = () => {
                   e.stopPropagation();
                   setSelectedNews({ title: item.title, details: item.details! });
                 }}
-                className="text-[10px] font-black text-nb-blue-primary uppercase tracking-widest hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-nb-blue-primary uppercase tracking-widest hover:underline flex items-center gap-1"
               >
                 <Info size={12} /> 更多详情
               </button>
@@ -812,10 +1059,10 @@ const Joystick = ({ onMove }: { onMove: (x: number, y: number) => void }) => {
   return (
     <div className="relative w-48 h-48 bg-nb-surface rounded-full border-4 border-nb-border flex items-center justify-center shadow-inner group">
       {/* Direction Indicators */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[8px] font-black text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">+Y</div>
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-black text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">-Y</div>
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">-X</div>
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">+X</div>
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 text-xs font-bold text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">+Y</div>
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs font-bold text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">-Y</div>
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">-X</div>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-nb-text-muted uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">+X</div>
       
       {/* Center Ring */}
       <div className="w-24 h-24 rounded-full border border-nb-border opacity-20" />
@@ -944,12 +1191,12 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
           { icon: <Zap size={20} />, label: '系统负载', value: '12%', color: 'text-nb-blue-primary' },
           { icon: <Database size={20} />, label: '存储空间', value: '85.2 GB', color: 'text-nb-text' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white border border-nb-border p-8 rounded-[2.5rem] shadow-sm flex items-center gap-6">
+          <div key={i} className="bg-white border border-nb-border p-8 rounded-3xl shadow-sm flex items-center gap-6">
             <div className={`p-4 bg-nb-surface rounded-2xl ${stat.color}`}>
               {stat.icon}
             </div>
             <div>
-              <p className="text-[10px] font-display font-black tracking-[0.2em] text-nb-text-muted uppercase mb-1">{stat.label}</p>
+              <p className="text-xs font-display font-bold tracking-wider text-nb-text-muted uppercase mb-1">{stat.label}</p>
               <p className="text-xl font-display font-bold text-nb-text">{stat.value}</p>
             </div>
           </div>
@@ -958,13 +1205,13 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
 
       <motion.div layout className={`flex ${isFullScreen ? 'flex-col' : 'flex-row'} gap-8`}>
         <motion.div layout className={`${isFullScreen ? 'order-2 flex flex-row gap-8' : 'flex-1 flex flex-col gap-8'}`}>
-          <div className="bg-white border border-nb-border rounded-[3rem] p-10 shadow-sm flex-1 flex flex-col">
+          <div className="bg-white border border-nb-border rounded-3xl p-10 shadow-sm flex-1 flex flex-col">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase">实时坐标与控制</h3>
+              <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase">实时坐标与控制</h3>
               <div className="flex gap-2">
                 <button 
                   onClick={() => setIsAutoScanning(!isAutoScanning)}
-                  className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-[10px] font-black transition-all active:scale-95 ${
+                  className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-xs font-bold transition-all active:scale-95 ${
                     isAutoScanning 
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
                       : 'bg-nb-surface border-nb-border text-nb-text hover:bg-nb-blue-light'
@@ -975,7 +1222,7 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                 </button>
                 <button 
                   onClick={onHome}
-                  className="flex items-center gap-2 px-4 py-2 bg-nb-surface border border-nb-border rounded-xl text-[10px] font-black text-nb-text hover:bg-nb-blue-light hover:text-nb-blue-primary transition-all active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 bg-nb-surface border border-nb-border rounded-xl text-xs font-bold text-nb-text hover:bg-nb-blue-light hover:text-nb-blue-primary transition-all active:scale-95"
                 >
                   <Home size={14} /> 全轴归零
                 </button>
@@ -986,14 +1233,14 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
               <div className="space-y-6 flex-1">
                 {['X', 'Y', 'Z'].map((axis) => (
                   <div key={axis} className="flex items-center gap-6">
-                    <div className="w-10 h-10 bg-nb-text text-white rounded-xl flex items-center justify-center font-display font-black text-sm shadow-lg">
+                    <div className="w-10 h-10 bg-nb-text text-white rounded-xl flex items-center justify-center font-display font-bold text-sm shadow-lg">
                       {axis}
                     </div>
                     <div className="flex-1 bg-nb-surface rounded-xl px-6 py-3 flex items-center justify-between border border-nb-border">
                       <span className="text-xl font-display font-bold tracking-tight text-nb-text">
                         {state.axes[axis as keyof typeof state.axes].toFixed(4)}
                       </span>
-                      <span className="text-[8px] font-black text-nb-text-muted uppercase">MM</span>
+                      <span className="text-xs font-bold text-nb-text-muted uppercase">MM</span>
                     </div>
                   </div>
                 ))}
@@ -1010,14 +1257,14 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                     className="w-12 h-12 bg-nb-surface border border-nb-border rounded-xl flex flex-col items-center justify-center text-nb-text hover:bg-nb-blue-light hover:text-nb-blue-primary transition-all active:scale-90"
                   >
                     <ChevronDown size={20} />
-                    <span className="text-[8px] font-black">Z-</span>
+                    <span className="text-xs font-bold">Z-</span>
                   </button>
                   <button 
                     onClick={() => onAxisMove('Z', 1)}
                     className="w-12 h-12 bg-nb-surface border border-nb-border rounded-xl flex flex-col items-center justify-center text-nb-text hover:bg-nb-blue-light hover:text-nb-blue-primary transition-all active:scale-90"
                   >
                     <ChevronUp size={20} />
-                    <span className="text-[8px] font-black">Z+</span>
+                    <span className="text-xs font-bold">Z+</span>
                   </button>
                 </div>
               </div>
@@ -1027,15 +1274,15 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
         </motion.div>
 
         <div className={`${isFullScreen ? 'order-1 flex-1 flex items-center justify-center' : 'flex-1 flex flex-col gap-8'}`}>
-          <motion.div layout transition={{ type: "spring", stiffness: 300, damping: 30 }} className={`bg-nb-text rounded-[3rem] ${isFullScreen ? 'p-4' : 'p-10'} text-white ${isFullScreen ? 'w-full aspect-[16/9] scale-[1.05]' : 'flex-1'} relative overflow-hidden group`}>
+          <motion.div layout transition={{ type: "spring", stiffness: 300, damping: 30 }} className={`bg-nb-text rounded-3xl ${isFullScreen ? 'p-4' : 'p-10'} text-white ${isFullScreen ? 'w-full aspect-[16/9] scale-[1.05]' : 'flex-1'} relative overflow-hidden group`}>
             <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/20 blur-[80px] rounded-full" />
             <div className="relative z-10 h-full flex flex-col">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-white/50 uppercase">实时视觉反馈</h3>
+                  <h3 className="text-xs font-display font-bold tracking-widest text-white/50 uppercase">实时视觉反馈</h3>
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-[10px] font-black text-emerald-400">LIVE</span>
+                    <span className="text-xs font-bold text-emerald-400">LIVE</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1044,7 +1291,7 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                 </div>
               </div>
               
-              <div className="flex-1 bg-white/5 rounded-[2.5rem] border border-white/10 flex items-center justify-center overflow-hidden relative">
+              <div className="flex-1 bg-white/5 rounded-3xl border border-white/10 flex items-center justify-center overflow-hidden relative">
                 {/* Camera Feed */}
                 <video ref={videoRef} className="hidden" />
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain" />
@@ -1057,12 +1304,12 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                 <div className="absolute inset-0 p-6 flex flex-col justify-between pointer-events-none">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
-                      <div className="text-[8px] font-black text-white/40 uppercase tracking-widest">Resolution</div>
-                      <div className="text-[10px] font-bold text-white/80">4K @ 60FPS</div>
+                      <div className="text-xs font-bold text-white/40 uppercase tracking-widest">Resolution</div>
+                      <div className="text-xs font-bold text-white/80">4K @ 60FPS</div>
                     </div>
                     <div className="text-right space-y-1">
-                      <div className="text-[8px] font-black text-white/40 uppercase tracking-widest">Latency</div>
-                      <div className="text-[10px] font-bold text-emerald-400">12ms</div>
+                      <div className="text-xs font-bold text-white/40 uppercase tracking-widest">Latency</div>
+                      <div className="text-xs font-bold text-emerald-400">12ms</div>
                     </div>
                   </div>
                   
@@ -1082,18 +1329,18 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-nb-blue-primary rounded-full animate-ping" />
-                        <span className="text-[10px] font-black tracking-widest text-white">AUTO_FOCUS: ON</span>
+                        <span className="text-xs font-bold tracking-widest text-white">AUTO_FOCUS: ON</span>
                       </div>
-                      <div className="text-[8px] font-bold text-white/40">ISO 400 | F2.8 | 1/125</div>
+                      <div className="text-xs font-bold text-white/40">ISO 400 | F2.8 | 1/125</div>
                     </div>
                     <div className="flex gap-4">
                       <div className="text-right">
-                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest">X_POS</div>
-                        <div className="text-[10px] font-bold text-white">{state.axes.X.toFixed(2)}</div>
+                        <div className="text-xs font-bold text-white/40 uppercase tracking-widest">X_POS</div>
+                        <div className="text-xs font-bold text-white">{state.axes.X.toFixed(2)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest">Y_POS</div>
-                        <div className="text-[10px] font-bold text-white">{state.axes.Y.toFixed(2)}</div>
+                        <div className="text-xs font-bold text-white/40 uppercase tracking-widest">Y_POS</div>
+                        <div className="text-xs font-bold text-white">{state.axes.Y.toFixed(2)}</div>
                       </div>
                     </div>
                   </div>
@@ -1119,7 +1366,7 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
                     onChange={(e) => setProgress(Number(e.target.value))}
                     className="flex-1 h-1 bg-white/20 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-nb-blue-primary"
                   />
-                  <span className="text-[10px] font-mono text-white">{progress}%</span>
+                  <span className="text-xs font-mono text-white">{progress}%</span>
                 </div>
               </div>
             </div>
@@ -1128,8 +1375,8 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
       </motion.div>
 
       {/* AMS Section */}
-      <div className="bg-white border border-nb-border rounded-[3rem] p-10 shadow-sm">
-        <h3 className="text-[10px] font-display font-black tracking-[0.3em] text-nb-text-muted uppercase mb-8">传感器系统</h3>
+      <div className="bg-white border border-nb-border rounded-3xl p-10 shadow-sm">
+        <h3 className="text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase mb-8">传感器系统</h3>
         <div className="grid grid-cols-4 gap-8">
           {[
             { id: 'S1', color: 'blue-gradient', label: '高精度探针 A' },
@@ -1140,7 +1387,7 @@ const DeviceView = ({ state, onAxisMove, onHome }: { state: any, onAxisMove: (ax
             <div key={slot.id} className="group cursor-pointer">
               <div className={`aspect-square rounded-3xl ${slot.color} mb-4 shadow-lg group-hover:scale-105 transition-transform duration-300 relative overflow-hidden`}>
                 <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent" />
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-nb-text">
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-nb-text">
                   {slot.id}
                 </div>
               </div>
@@ -1170,7 +1417,7 @@ const WelcomeScreen = ({ onStart }: { onStart: () => void }) => (
         >
           巧
         </motion.div>
-        <h1 className="text-6xl font-display font-black tracking-tighter text-nb-text mb-4">
+        <h1 className="text-6xl font-display font-bold tracking-tighter text-nb-text mb-4">
           灵寻巧度 <span className="text-nb-blue-primary">——桌面级智能三坐标测量系统</span>
         </h1>
         <p className="text-xl text-nb-text-muted max-w-2xl">
@@ -1216,19 +1463,19 @@ const WelcomeScreen = ({ onStart }: { onStart: () => void }) => (
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 * i + 0.5 }}
-            className="bg-nb-surface border border-nb-border p-8 rounded-[2rem] hover:shadow-xl transition-all group"
+            className="bg-nb-surface border border-nb-border p-8 rounded-3xl hover:shadow-xl transition-all group"
           >
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
               {feature.icon}
             </div>
-            <h3 className="text-lg font-display font-black text-nb-text mb-3">{feature.title}</h3>
+            <h3 className="text-lg font-display font-bold text-nb-text mb-3">{feature.title}</h3>
             <p className="text-sm text-nb-text-muted leading-relaxed">{feature.content}</p>
           </motion.div>
         ))}
       </div>
 
-      <div className="bg-nb-blue-primary/5 border border-nb-blue-primary/10 rounded-[3rem] p-12 mb-20">
-        <h2 className="text-3xl font-display font-black text-nb-text mb-10 text-center">产品型号定位</h2>
+      <div className="bg-nb-blue-primary/5 border border-nb-blue-primary/10 rounded-3xl p-12 mb-20">
+        <h2 className="text-3xl font-display font-bold text-nb-text mb-10 text-center">产品型号定位</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
             {
@@ -1248,8 +1495,8 @@ const WelcomeScreen = ({ onStart }: { onStart: () => void }) => (
               features: ["实训指导书", "师资培训", "多机联动"]
             }
           ].map((model, i) => (
-            <div key={i} className={`p-8 rounded-[2rem] ${model.highlight ? 'bg-nb-blue-primary text-white shadow-2xl shadow-nb-blue-primary/30' : 'bg-white border border-nb-border'}`}>
-              <h4 className={`text-xl font-display font-black mb-4 ${model.highlight ? 'text-white' : 'text-nb-text'}`}>{model.name}</h4>
+            <div key={i} className={`p-8 rounded-3xl ${model.highlight ? 'bg-nb-blue-primary text-white shadow-2xl shadow-nb-blue-primary/30' : 'bg-white border border-nb-border'}`}>
+              <h4 className={`text-xl font-display font-bold mb-4 ${model.highlight ? 'text-white' : 'text-nb-text'}`}>{model.name}</h4>
               <p className={`text-sm mb-6 ${model.highlight ? 'text-white/80' : 'text-nb-text-muted'}`}>{model.desc}</p>
               <ul className="space-y-3">
                 {model.features.map(f => (
@@ -1267,7 +1514,7 @@ const WelcomeScreen = ({ onStart }: { onStart: () => void }) => (
       <div className="flex justify-center">
         <button 
           onClick={onStart}
-          className="px-12 py-5 bg-nb-blue-primary text-white font-display font-black text-lg tracking-widest rounded-full shadow-2xl shadow-nb-blue-primary/30 hover:scale-105 active:scale-95 transition-all"
+          className="px-12 py-5 bg-nb-blue-primary text-white font-display font-bold text-lg tracking-widest rounded-full shadow-2xl shadow-nb-blue-primary/30 hover:scale-105 active:scale-95 transition-all"
         >
           立即进入系统
         </button>
@@ -1505,7 +1752,7 @@ export default function NeoBambu() {
         </main>
 
         {/* Footer */}
-        <footer className="h-10 bg-white border-t border-nb-border flex items-center px-8 justify-between text-[10px] font-display font-black tracking-widest text-nb-text-muted uppercase">
+        <footer className="h-10 bg-white border-t border-nb-border flex items-center px-8 justify-between text-xs font-display font-bold tracking-widest text-nb-text-muted uppercase">
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-nb-blue-primary" />
@@ -1519,7 +1766,7 @@ export default function NeoBambu() {
           <div className="flex items-center gap-6">
             <span>CPU: 12%</span>
             <span>MEM: 1.2GB</span>
-            <span className="text-nb-text font-black">V1.9.1</span>
+            <span className="text-nb-text font-bold">V1.9.1</span>
           </div>
         </footer>
       </div>
